@@ -1,12 +1,11 @@
 import os
 import time
 
-os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
-
 from visca_over_ip.exceptions import ViscaException
 from numpy import interp
 
-from config import ips, sensitivity_tables, Camera
+from config import ips, sensitivity_tables
+from visca_over_ip import Camera
 from startup_shutdown import shut_down, configure
 from controller import GameController, ButtonFunction, AxisFunction
 
@@ -41,6 +40,7 @@ def update_focus(controller: GameController, camera: Camera):
     focus_far = controller.is_button_pressed(ButtonFunction.FOCUS_FAR)
     manual_focus = camera.get_focus_mode() == 'manual'
 
+
     if focus_near and focus_far and time_since_last_adjust > .4:
         last_focus_time = time.time()
         if manual_focus:
@@ -71,8 +71,12 @@ def connect_to_camera(cam_index, current_camera=None) -> Camera:
         current_camera.zoom(0)
         current_camera.pantilt(0, 0)
         current_camera.close_connection()
-
-    camera = Camera(ips[cam_index])
+    ip_port = ips[cam_index].split(':')
+    if len(ip_port) > 1:
+        camera = Camera(ip_port[0], int(ip_port[1]))
+    else:
+        camera = Camera(ip_port[0])
+    print(ip_port)
 
     try:
         camera.zoom(0)
@@ -99,7 +103,7 @@ def main_loop(controller: GameController, camera: Camera):
                 invert_tilt = not invert_tilt
                 print('Tilt', 'inverted' if not invert_tilt else 'not inverted')
 
-        update_focus(controller, camera)
+        # update_focus(controller, camera)
 
         for short_press in controller.get_button_short_presses():
             camera.recall_preset(short_press.value)

@@ -4,6 +4,7 @@ import platform
 from typing import Iterable, Dict, List, Optional
 
 import pygame
+import pygame.event
 
 RESET_INTERVAL = 20 # Seconds
 LONG_PRESS_TIME = 2 # Seconds
@@ -107,17 +108,17 @@ class GameController:
                 pygame.display.init()
                 pygame.joystick.init()
                 self.joystick = pygame.joystick.Joystick(0)
-            except pygame.error:
+            except pygame.event.error:
                 input('No controller found. Please connect one then press enter: ')
             else:
                 break
 
     def wait_for_button_press(self) -> ButtonFunction:
         """Blocks until some button is pressed and then returns what button was pressed"""
-        while not pygame.event.peek(eventtype=pygame.JOYBUTTONDOWN):
+        while not pygame.event.peek(eventtype=pygame.event.JOYBUTTONDOWN):
             time.sleep(0.05)
 
-        event = pygame.event.get(eventtype=pygame.JOYBUTTONDOWN)[0]
+        event = pygame.event.get(eventtype=pygame.event.JOYBUTTONDOWN)[0]
         return self._pygame_to_button[event.dict['button']]
 
     def is_button_pressed(self, button: ButtonFunction) -> bool:
@@ -125,14 +126,14 @@ class GameController:
 
     def get_button_presses(self) -> Iterable[ButtonFunction]:
         presses = []
-        for event in pygame.event.get(eventtype=pygame.JOYBUTTONDOWN):
+        for event in pygame.event.get(eventtype=pygame.event.JOYBUTTONDOWN):
             presses.append(self._pygame_to_button[event.dict['button']])
             self._down_times[presses[0]] = time.time()
 
         return presses
 
     def _record_long_short_presses(self):
-        for event in pygame.event.get(eventtype=pygame.JOYBUTTONUP):
+        for event in pygame.event.get(eventtype=pygame.event.JOYBUTTONUP):
             button = self._pygame_to_button[event.dict['button']]
             if button in self._down_times and (time.time() - self._down_times[button]) > LONG_PRESS_TIME:
                 self._long_presses.append(button)
@@ -179,7 +180,7 @@ if __name__ == '__main__':
     controller = GameController()
 
     while True:
-        for event in pygame.event.get(eventtype=pygame.JOYBUTTONDOWN):
+        for event in pygame.event.get(eventtype=pygame.event.JOYBUTTONDOWN):
             pygame_id = event.dict['button']
             print(pygame_id, controller._pygame_to_button.get(pygame_id, 'UNMAPPED'))
 

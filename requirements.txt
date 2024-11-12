@@ -1,4 +1,0 @@
-pygame>=2.0.1
-visca_over_ip
-numpy
-plotly
