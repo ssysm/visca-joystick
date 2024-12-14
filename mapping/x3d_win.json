@@ -1,0 +1,9 @@
+{
+  "pan_axis": 0,
+  "tilt_axis": 1,
+  "zoom_axis": 2,
+  "focus_toggle_button": 0,
+  "invert_tilt": true,
+  "invert_pan": true,
+  "invert_zoom": true
+}

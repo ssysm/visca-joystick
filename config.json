@@ -1,8 +1,8 @@
 {
     "camera": {
-      "ip": "192.168.88.181",
-      "port": 5678
+      "ip": "192.168.1.110",
+      "port": 52381
     },
-    "controller_mapping": "./mapping/xbox_linux.json"
+    "controller_mapping": "./mapping/x3d_win.json"
   }
   

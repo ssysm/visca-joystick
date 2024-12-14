@@ -4,17 +4,20 @@ import sys
 import os 
 import time
 
+from queue import Queue
+
 from visca_over_ip.exceptions import ViscaException
 from numpy import interp
 
 from visca_over_ip import Camera
+from visca_thread import VISCAControlThread
 
 os.environ["SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS"] = "1"
 
 sensitivity_tables = {
     'pan': {'joy': [0, 0.05, 0.3, 0.7, 0.9, 1], 'cam': [0, 0, 2, 8, 15, 20]},
     'tilt': {'joy': [0, 0.07, 0.3, 0.65, 0.85, 1], 'cam': [0, 0, 3, 6, 14, 18]},
-    'zoom': {'joy': [0, 0.1, 1], 'cam': [0, 0, 7]},
+    'zoom': {'joy': [0, 0.2, 1], 'cam': [0, 0, 7]},
 }
 
 def joy_pos_to_cam_speed(axis_position: float, table_name: str, invert=True) -> int:
@@ -51,14 +54,6 @@ def load_config(file_path='config.json'):
     with open(file_path, 'r', encoding='utf-8') as file:
         return json.load(file)
 
-# # Function to initialize Pygame and joystick
-# def init_pygame():
-#     pygame.init()
-#     pygame.joystick.init()
-#     joystick = pygame.joystick.Joystick(0)
-#     joystick.init()
-#     return joystick
-
 # Function to display camera status on screen
 def display_status(screen, font, focus_mode, zoom_level, pan_speed, tilt_speed):
     screen.fill((0, 0, 0))  # Clear screen
@@ -93,12 +88,23 @@ def main_loop(config, camera: Camera):
     old_pan_speed = 0
     tilt_speed = 0
     old_tilt_speed = 0
+
+    ptQueue = Queue()
+    zoomQueue = Queue()
+    focusQueue = Queue()
+    controlQueue = Queue()
+
+    # Start the VISCA control thread
+    control_thread = VISCAControlThread(
+        camera, ptQueue, zoomQueue, focusQueue, controlQueue
+    )
     
     zoom_level = 0
     joysticks = {}
 
     # Main loop
     running = True
+    control_thread.start()
     # pygame.event.set_grab(True) # Keeps the cursor within the pygame window
     while running:
         for event in pygame.event.get():
@@ -109,39 +115,49 @@ def main_loop(config, camera: Camera):
                 if event.button == controller_mapping['focus_toggle_button']:
                     # toggle_focus()
                     focus_mode = "Manual" if focus_mode == "Auto" else "Auto"
+            elif event.type == 1536:                    
+                print(event)
+                axis = event.axis
+                axis_position = event.value
+                if axis == controller_mapping['pan_axis']:
+                    pan_speed = joy_pos_to_cam_speed(axis_position, 'pan', invert=invert_pan)
+                elif axis == controller_mapping['tilt_axis']:
+                    tilt_speed = joy_pos_to_cam_speed(axis_position, 'tilt', invert=invert_tilt)
+                elif axis == controller_mapping['zoom_axis']:
+                    zoom_level = joy_pos_to_cam_speed(axis_position, 'zoom', invert=invert_zoom)
             # Handle hotplugging
-            if event.type == pygame.JOYDEVICEADDED:
+            elif event.type == pygame.JOYDEVICEADDED:
                 # This event will be generated when the program starts for every
                 # joystick, filling up the list without needing to create them manually.
                 joy = pygame.joystick.Joystick(event.device_index)
                 joysticks[joy.get_instance_id()] = joy
                 print(f"Joystick {joy.get_instance_id()} connencted")
 
-            if event.type == pygame.JOYDEVICEREMOVED:
+            elif event.type == pygame.JOYDEVICEREMOVED:
                 del joysticks[event.instance_id]
                 print(f"Joystick {event.instance_id} disconnected")
-        if  len(joysticks) == 0:
-            continue
-        # use the first joystick
-        joystick = joysticks[list(joysticks.keys())[0]]
 
-        for axis in range(joystick.get_numaxes()):
-            axis_position = joystick.get_axis(axis)
-            if axis == controller_mapping['pan_axis']:
-                pan_speed = joy_pos_to_cam_speed(axis_position, 'pan', invert=invert_pan)
-            elif axis == controller_mapping['tilt_axis']:
-                tilt_speed = joy_pos_to_cam_speed(axis_position, 'tilt', invert=invert_tilt)
-            elif axis == controller_mapping['zoom_axis']:
-                zoom_level = joy_pos_to_cam_speed(axis_position, 'zoom', invert=invert_zoom)
-                camera.zoom(zoom_level)
+        # if zoomQueue.qsize() == 0:
+        #     zoomQueue.put(zoom_level)
+
         if pan_speed != old_pan_speed or tilt_speed != old_tilt_speed:
-            camera.pantilt(pan_speed, tilt_speed)
+            ptQueue.put((pan_speed, tilt_speed))
+            ptQueue.join()
+        zoomQueue.put(zoom_level)
+        zoomQueue.join()
+
         # Display camera status
         display_status(screen, font, focus_mode, zoom_level, pan_speed, tilt_speed)
-        
+
         old_pan_speed = pan_speed
         old_tilt_speed = tilt_speed
-        clock.tick(200)
+        
+        try:
+            clock.tick(100)
+        except KeyboardInterrupt:
+            running = False
+
+    control_thread.stop()
 
     # Cleanup
     pygame.quit()

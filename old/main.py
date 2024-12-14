@@ -4,7 +4,6 @@ import time
 from visca_over_ip.exceptions import ViscaException
 from numpy import interp
 
-from config import ips, sensitivity_tables
 from visca_over_ip import Camera
 from startup_shutdown import shut_down, configure
 from controller import GameController, ButtonFunction, AxisFunction

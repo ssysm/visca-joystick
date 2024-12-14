@@ -3,7 +3,7 @@ import time
 from visca_over_ip import Camera
 
 from config import ips
-from controller import GameController, ButtonFunction
+from old.controller import GameController, ButtonFunction
 
 
 def configure(controller: GameController):
